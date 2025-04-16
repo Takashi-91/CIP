@@ -11,7 +11,7 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(cors({ origin: "http://localhost:3000", credentials: true })); // Frontend URL
+app.use(cors({ origin: "http://localhost:5173", credentials: true })); // Frontend URL
 app.use(helmet());
 
 // Optional HTTPS redirect for production
