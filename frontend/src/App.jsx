@@ -5,7 +5,6 @@ import AuthForm from './components/AuthForm.jsx'
 import Home from './pages/Home.jsx'
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
-import User from "./pages/User";
 import NotFound from "./pages/NotFound";
 
 function App() {
