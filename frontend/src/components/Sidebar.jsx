@@ -1,17 +1,15 @@
-import { Link } from "react-router-dom";
-
+// components/Sidebar.jsx
 export default function Sidebar() {
   return (
-    <div className="w-64 h-screen bg-gray-100 shadow-lg p-5 fixed">
-      <h2 className="text-2xl font-bold mb-10">Jaydon Frankie</h2>
-      <nav className="flex flex-col gap-4">
-        <Link to="/" className="hover:text-blue-600 font-medium">Dashboard</Link>
-        <Link to="/user" className="hover:text-blue-600 font-medium">User</Link>
-        <Link to="/product" className="hover:text-blue-600 font-medium">Product</Link>
-        <Link to="/blog" className="hover:text-blue-600 font-medium">Blog</Link>
-        <Link to="/login" className="hover:text-blue-600 font-medium">Login</Link>
-        <Link to="/404" className="hover:text-blue-600 font-medium">Not Found</Link>
-      </nav>
-    </div>
+    <nav className="bg-white shadow-md p-4 fixed w-full z-10">
+      <div className="container mx-auto flex justify-between items-center">
+        <h1 className="text-xl font-semibold">My Dashboard</h1>
+        <ul className="flex space-x-4">
+          <li><a href="#" className="text-blue-600 hover:underline">Home</a></li>
+          <li><a href="#" className="text-blue-600 hover:underline">Reports</a></li>
+          <li><a href="#" className="text-blue-600 hover:underline">Settings</a></li>
+        </ul>
+      </div>
+    </nav>
   );
 }
