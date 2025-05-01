@@ -1,4 +1,5 @@
 import React from 'react'
+import Navbar from "../components/Sidebar";
 import StatCard from "../components/StatCard";
 import {
   PieChart,
