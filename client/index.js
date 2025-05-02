@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const helmet = require("helmet");
 
 // Gets client URL from environment variables
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173/";
+const CLIENT_URL = process.env.CLIENT_URL || "https://cip-green.vercel.app/";
 console.log(`Client URL set to: ${CLIENT_URL}`);
 const app = express();
 
@@ -14,19 +14,28 @@ const app = express();
 app.use(express.json({ limit: '10kb' }));
 app.use(helmet());
 
-// CORS setup with environment variables
+const allowedOrigins = [
+  'https://cip-green.vercel.app',
+  'http://localhost:5173'
+];
+
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", CLIENT_URL);
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Credentials", "true");
+  }
+
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Credentials", "true");
-  
+
   if (req.method === "OPTIONS") {
-    return res.status(200).end();
+    return res.sendStatus(200);
   }
-  
+
   next();
 });
+
 
 // Custom security middleware
 
