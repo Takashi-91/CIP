@@ -6,9 +6,8 @@ const jwt = require("jsonwebtoken");
 const helmet = require("helmet");
 
 // Gets client URL from environment variables
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173/";
 console.log(`Client URL set to: ${CLIENT_URL}`);
-const PORT = process.env.PORT || 9000;
 const app = express();
 
 // Basic middleware
