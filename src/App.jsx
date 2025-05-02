@@ -69,7 +69,7 @@ function App() {
         />
         
         {/* Fallback route - redirect to dashboard if authenticated, otherwise to login */}
-        <Route path="*" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/" />} />
+        <Route path="*" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/dashboard" />} />
       </Routes>
     </Router>
   )
