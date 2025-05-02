@@ -85,7 +85,7 @@ function AuthForm() {
 
     try {
       if (isLogin) {
-        const response = await axios.post('http://localhost:9000/api/auth/login', {
+        const response = await axios.post('https://cip-oimt.onrender.com/api/auth/login', {
           email: formData.email,
           password: formData.password,
         });
@@ -94,10 +94,10 @@ function AuthForm() {
         
         // Add a small delay before redirecting to show the success message
         setTimeout(() => {
-          navigate('/payments');
+          navigate('/dashboard');
         }, 700);
       } else {
-        const response = await axios.post('http://localhost:9000/api/auth/register', formData);
+        const response = await axios.post('https://cip-oimt.onrender.com/api/auth/register', formData);
         setMessage(response.data.msg || 'Registration successful! You can now log in.');
         setFormData({ name: '', email: '', password: '' });
         setIsLogin(true);

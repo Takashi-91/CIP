@@ -227,7 +227,7 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
       return res.status(400).json({ msg: "Invalid email format" });
 
     // Password pattern check is optional on login for user convenience
-    // but we'll still validate minimum length for security
+    // but we're still validate minimum length for security
     if (password.length < 8)
       return res.status(400).json({ msg: "Invalid password format" });
 
