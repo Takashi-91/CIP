@@ -240,10 +240,10 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
       return res.status(400).json({ msg: "Invalid password format" });
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ msg: "Invalid credentials" });
+    if (!user) return res.status(400).json({ msg: "Invalid Email Try Again" });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ msg: "Invalid credentials" });
+    if (!match) return res.status(400).json({ msg: "Invalid Password Try Again" });
 
     const payload = { user: { id: user._id } };
     const token = jwt.sign(payload, process.env.JWT_SECRET || "default_jwt_secret", { expiresIn: "1h" });
