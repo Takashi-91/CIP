@@ -4,7 +4,7 @@ import {
   FiArrowUpRight, FiArrowDownLeft, FiCreditCard, FiPieChart, 
   FiDollarSign, FiShield, FiGlobe, FiRefreshCw 
 } from 'react-icons/fi';
-import Sidebar from '../components/Sidebar';
+import Sidebar from '../layout/Sidebar';
 
 // Sample data - replace with API calls in production
 const recentTransactions = [

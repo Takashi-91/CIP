@@ -4,7 +4,7 @@ import {
   FiSend, FiAlertCircle, FiCheckCircle, FiDollarSign, 
   FiGlobe, FiUser, FiClock, FiCalendar
 } from 'react-icons/fi'
-import Sidebar from './Sidebar'
+import Sidebar from '../layout/Sidebar'
 
 function Payments() {
   const [formData, setFormData] = useState({

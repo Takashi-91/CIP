@@ -1,10 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import './App.css'
-import Payments from './components/Payments.jsx'
-import AuthForm from './components/AuthForm.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import Home from './pages/Home.jsx'
+import '../style/App.css'
+import Payments from '../components/payments/TransactionHistory.jsx'
+import AuthForm from '../components/auth/AuthForm.jsx'
+import Dashboard from '../components/employee dashboard/Dashboard.jsx'
+import Home from '../pages/Index.jsx'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
