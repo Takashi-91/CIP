@@ -90,11 +90,24 @@ function AuthForm() {
           password: formData.password,
         });
         localStorage.setItem('token', response.data.token);
+
+        // Decode token to get user role
+        const base64Url = response.data.token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        const user = JSON.parse(jsonPayload).user;
+        localStorage.setItem('role', user.role);
+
         setMessage('Login successful! Redirecting to dashboard...');
         
         // Add a small delay before redirecting to show the success message
         setTimeout(() => {
           navigate('/dashboard');
+          if (typeof updateAuth === 'function') {
+            updateAuth();
+          }
         }, 700);
       } else {
         const response = await axios.post('http://localhost:9000/api/auth/register', formData);
