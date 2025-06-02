@@ -5,12 +5,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const helmet = require("helmet");
 
-// Gets client URL from environment variables
-const CLIENT_URL = process.env.CLIENT_URL || "https://cip-green.vercel.app/";
-console.log(`Client URL set to: ${CLIENT_URL}`);
 const app = express();
-
-// Basic middleware
 app.use(express.json({ limit: '10kb' }));
 app.use(helmet());
 
@@ -25,125 +20,67 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Access-Control-Allow-Credentials", "true");
   }
-
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-
+  if (req.method === "OPTIONS") return res.sendStatus(200);
   next();
 });
 
-
-// Custom security middleware
-
-// 1. MongoDB sanitization to prevent NoSQL injection
+// Security middlewares
 app.use((req, res, next) => {
-  if (req.body) {
-    const sanitizeObject = (obj) => {
-      const result = {};
-      
-      Object.keys(obj).forEach(key => {
-        // Remove keys that start with $ or contain a dot
-        if (key.startsWith('$') || key.includes('.')) return;
-        
-        const value = obj[key];
-        
-        if (typeof value === 'object' && value !== null) {
-          result[key] = sanitizeObject(value);
-        } else {
-          result[key] = value;
-        }
-      });
-      
-      return result;
-    };
-    
-    req.body = sanitizeObject(req.body);
-  }
-  
-  next();
-});
-
-// 2. XSS prevention
-app.use((req, res, next) => {
-  if (req.body) {
-    const sanitizeObject = (obj) => {
-      Object.keys(obj).forEach(key => {
-        if (typeof obj[key] === 'string') {
-          obj[key] = obj[key]
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#x27;')
-            .replace(/\//g, '&#x2F;');
-        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-          sanitizeObject(obj[key]);
-        }
-      });
-    };
-    
-    sanitizeObject(req.body);
-  }
-  
-  next();
-});
-
-// 3. Simple rate limiting
-const rateLimit = (maxRequests, timeWindowMs) => {
-  const requests = new Map();
-  
-  return (req, res, next) => {
-    const ip = req.ip;
-    const now = Date.now();
-    
-    // This cleans up old entries
-    requests.forEach((timestamp, key) => {
-      if (now - timestamp > timeWindowMs) {
-        requests.delete(key);
-      }
-    });
-    
-    // This checks your current IP
-    const requestTimes = requests.get(ip) || [];
-    const recentRequests = requestTimes.filter(time => now - time < timeWindowMs);
-    
-    if (recentRequests.length >= maxRequests) {
-      return res.status(429).json({ msg: "Too many requests, please try again later" });
+  const sanitize = (obj) => {
+    for (let key in obj) {
+      if (key.startsWith('$') || key.includes('.')) delete obj[key];
+      else if (typeof obj[key] === 'object') sanitize(obj[key]);
     }
-    
-    // Add current request
-    recentRequests.push(now);
-    requests.set(ip, recentRequests);
-    
+  };
+  if (req.body) sanitize(req.body);
+  next();
+});
+
+app.use((req, res, next) => {
+  const sanitize = (obj) => {
+    for (let key in obj) {
+      if (typeof obj[key] === 'string') {
+        obj[key] = obj[key]
+          .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
+          .replace(/\//g, '&#x2F;').trim();
+      } else if (typeof obj[key] === 'object') sanitize(obj[key]);
+    }
+  };
+  if (req.body) sanitize(req.body);
+  next();
+});
+
+// Rate limiter
+const rateLimit = (max, windowMs) => {
+  const requests = new Map();
+  return (req, res, next) => {
+    const ip = req.ip, now = Date.now();
+    requests.forEach((times, ip) => {
+      requests.set(ip, times.filter(t => now - t < windowMs));
+    });
+    const times = requests.get(ip) || [];
+    if (times.length >= max) return res.status(429).json({ msg: "Too many requests" });
+    times.push(now);
+    requests.set(ip, times);
     next();
   };
 };
-
-// Applies a rate limiting to auth routes
 const authLimiter = rateLimit(10, 15 * 60 * 1000);
 
-// Input validation patterns
+// Regex Patterns
 const emailPattern = /^[a-zA-Z0-9._+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-=\[\]{}|;:,.<>\/\\])[A-Za-z\d@$!%*?&#^()_+\-=\[\]{}|;:,.<>\/\\]{10,}$/;
 const namePattern = /^[A-Za-z\s]{2,40}$/;
-const amountPattern = /^(?!0+\.?0*$)(\d{1,10}(\.\d{1,2})?)$/;
-const currencyPattern = /^[A-Z]{3}$/;
-const recipientPattern = /^[A-Za-z0-9\s,.'\-]{2,50}$/;
 
-// Input sanitization helper
+// Helper
 function sanitizeInput(input) {
   if (typeof input !== 'string') return input;
-  
-  return input
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;')
-    .trim();
+  return input.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
+              .replace(/\//g, '&#x2F;').trim();
 }
 
 // MongoDB Schemas
@@ -151,25 +88,27 @@ const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
   password: String,
+  role: { type: String, enum: ['employee', 'customer'], required: true },
+  balance: { type: Number, default: 5000 },
+  isFrozen: { type: Boolean, default: false },
 });
 const User = mongoose.model("User", userSchema);
 
-const paymentSchema = new mongoose.Schema({
-  userId: mongoose.Schema.Types.ObjectId,
+const transactionSchema = new mongoose.Schema({
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   amount: Number,
-  currency: String,
-  recipient: String,
-  date: { type: Date, default: Date.now },
+  type: { type: String, enum: ['deposit', 'withdrawal', 'transfer'] },
+  timestamp: { type: Date, default: Date.now },
 });
-const Payment = mongoose.model("Payment", paymentSchema);
+const Transaction = mongoose.model("Transaction", transactionSchema);
 
-// JWT middleware
+// Middleware
 function authMiddleware(req, res, next) {
   const token = req.header("Authorization")?.split(" ")[1];
-  if (!token) return res.status(401).json({ msg: "No token, auth denied" });
-
+  if (!token) return res.status(401).json({ msg: "No token" });
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "default_jwt_secret");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret");
     req.user = decoded.user;
     next();
   } catch {
@@ -177,155 +116,118 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// Routes
+async function employeeOnly(req, res, next) {
+  const user = await User.findById(req.user.id);
+  if (!user || user.role !== "employee") return res.status(403).json({ msg: "Access denied" });
+  next();
+}
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("🌍 Secure Payments API is running");
-});
+// Routes
+app.get("/", (req, res) => res.send("🌍 Secure Banking API is live"));
 
 // Register
 app.post("/api/auth/register", authLimiter, async (req, res) => {
-  try {
-    let { name, email, password } = req.body;
-    
-    // Sanitize inputs
-    name = sanitizeInput(name);
-    email = sanitizeInput(email);
-    
-    if (!name || !email || !password) 
-      return res.status(400).json({ msg: "All fields are required" });
+  let { name, email, password, role } = req.body;
+  name = sanitizeInput(name);
+  email = sanitizeInput(email);
 
-    if (!namePattern.test(name)) 
-      return res.status(400).json({ msg: "Invalid name format" });
-    
-    if (!emailPattern.test(email)) 
-      return res.status(400).json({ msg: "Invalid email format" });
-    
-    if (!passwordPattern.test(password))
-      return res.status(400).json({ msg: "Password must be at least 10 characters with uppercase, lowercase, number and special character" });
+  if (!name || !email || !password || !role) return res.status(400).json({ msg: "Missing fields" });
+  if (!namePattern.test(name)) return res.status(400).json({ msg: "Invalid name" });
+  if (!emailPattern.test(email)) return res.status(400).json({ msg: "Invalid email" });
+  if (!passwordPattern.test(password)) return res.status(400).json({ msg: "Weak password" });
+  if (!["employee", "customer"].includes(role)) return res.status(400).json({ msg: "Invalid role" });
 
-    const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ msg: "User already exists" });
+  const exists = await User.findOne({ email });
+  if (exists) return res.status(400).json({ msg: "Email already registered" });
 
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const newUser = new User({ name, email, password: hashedPassword });
-    await newUser.save();
-
-    res.status(201).json({ msg: "User registered successfully" });
-  } catch (error) {
-    console.error("Registration error:", error);
-    res.status(500).json({ msg: "Server error" });
-  }
+  const hashed = await bcrypt.hash(password, 12);
+  await User.create({ name, email, password: hashed, role });
+  res.status(201).json({ msg: "Registered" });
 });
 
 // Login
 app.post("/api/auth/login", authLimiter, async (req, res) => {
-  try {
-    let { email, password } = req.body;
-    
-    // Sanitize email
-    email = sanitizeInput(email);
-    
-    if (!email || !password)
-      return res.status(400).json({ msg: "All fields are required" });
+  let { email, password } = req.body;
+  email = sanitizeInput(email);
+  if (!email || !password) return res.status(400).json({ msg: "Missing fields" });
 
-    if (!emailPattern.test(email))
-      return res.status(400).json({ msg: "Invalid email format" });
+  const user = await User.findOne({ email });
+  if (!user) return res.status(400).json({ msg: "Invalid email" });
 
-    // Password pattern check is optional on login for user convenience
-    // but we're still validate minimum length for security
-    if (password.length < 8)
-      return res.status(400).json({ msg: "Invalid password format" });
+  const match = await bcrypt.compare(password, user.password);
+  if (!match) return res.status(400).json({ msg: "Invalid password" });
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ msg: "Invalid Email Try Again" });
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ msg: "Invalid Password Try Again" });
-
-    const payload = { user: { id: user._id } };
-    const token = jwt.sign(payload, process.env.JWT_SECRET || "default_jwt_secret", { expiresIn: "1h" });
-
-    res.json({ token });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ msg: "Server error" });
-  }
+  const token = jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET || "secret", { expiresIn: "1h" });
+  res.json({ token });
 });
 
-// Create Payment
-app.post("/api/payments/create", authMiddleware, async (req, res) => {
-  try {
-    let { amount, currency, recipient } = req.body;
-    
-    // Sanitize inputs
-    recipient = sanitizeInput(recipient);
-    currency = sanitizeInput(currency);
-    
-    if (!amount || !currency || !recipient)
-      return res.status(400).json({ msg: "All fields are required" });
+// Transfer Money
+app.post("/api/transactions/transfer", authMiddleware, async (req, res) => {
+  const { recipientEmail, amount } = req.body;
+  const sender = await User.findById(req.user.id);
+  const recipient = await User.findOne({ email: recipientEmail });
 
-    // Convert amount to string for pattern testing
-    const amountStr = amount.toString();
-    
-    if (!amountPattern.test(amountStr)) 
-      return res.status(400).json({ msg: "Invalid amount format" });
-    
-    if (!currencyPattern.test(currency)) 
-      return res.status(400).json({ msg: "Invalid currency format" });
-    
-    if (!recipientPattern.test(recipient)) 
-      return res.status(400).json({ msg: "Invalid recipient format" });
+  if (!recipient || sender.isFrozen || sender.balance < amount) 
+    return res.status(400).json({ msg: "Invalid transfer" });
 
-    const payment = new Payment({
-      userId: req.user.id,
-      amount: parseFloat(amount),
-      currency,
-      recipient,
-    });
+  sender.balance -= amount;
+  recipient.balance += amount;
+  await sender.save(); await recipient.save();
 
-    await payment.save();
-    res.status(201).json({ msg: "Payment successful" });
-  } catch (error) {
-    console.error("Payment creation error:", error);
-    res.status(500).json({ msg: "Server error" });
-  }
+  await Transaction.create({ sender: sender._id, recipient: recipient._id, amount, type: 'transfer' });
+  res.json({ msg: "Transfer complete" });
 });
 
-// Get Payment History
-app.get("/api/payments/history", authMiddleware, async (req, res) => {
-  try {
-    const history = await Payment.find({ userId: req.user.id });
-    res.json(history);
-  } catch (error) {
-    console.error("History error:", error);
-    res.status(500).json({ msg: "Server error" });
-  }
+// Withdraw
+app.post("/api/transactions/withdraw", authMiddleware, async (req, res) => {
+  const { amount } = req.body;
+  const user = await User.findById(req.user.id);
+  if (user.isFrozen || amount < 50000 || user.balance < amount)
+    return res.status(400).json({ msg: "Invalid withdrawal" });
+
+  user.balance -= amount;
+  await user.save();
+  await Transaction.create({ sender: user._id, amount, type: 'withdrawal' });
+
+  res.json({ msg: "Withdrawal complete" });
 });
 
-// Start Server
-const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/securePayments";
+// View Transactions
+app.get("/api/transactions/history", authMiddleware, async (req, res) => {
+  const txs = await Transaction.find({
+    $or: [{ sender: req.user.id }, { recipient: req.user.id }]
+  }).sort({ timestamp: -1 });
+  res.json(txs);
+});
 
-mongoose.connect(MONGO_URI)
+// Freeze/Unfreeze (Employees)
+app.post("/api/employees/freeze", authMiddleware, employeeOnly, async (req, res) => {
+  const { userId, freeze } = req.body;
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ msg: "Not found" });
+  user.isFrozen = freeze;
+  await user.save();
+  res.json({ msg: `Account ${freeze ? "frozen" : "unfrozen"}` });
+});
+
+// Remove user (Employees)
+app.delete("/api/employees/remove/:id", authMiddleware, employeeOnly, async (req, res) => {
+  await User.findByIdAndDelete(req.params.id);
+  res.json({ msg: "User removed" });
+});
+
+// Edit user
+app.put("/api/users/update", authMiddleware, async (req, res) => {
+  const updates = {};
+  if (req.body.name) updates.name = sanitizeInput(req.body.name);
+  if (req.body.email && emailPattern.test(req.body.email)) updates.email = req.body.email;
+  const updated = await User.findByIdAndUpdate(req.user.id, updates, { new: true });
+  res.json(updated);
+});
+
+// MongoDB and Server
+mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/bank", {})
   .then(() => {
-    // Uses completely different port to avoid conflicts
-    const server = app.listen(9000, () => {
-      console.log("✅ Server running securely on port 9000");
-    });
-    
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error('Port 9000 is already in use!');
-        // Try another port
-        const newServer = app.listen(0, () => {
-          const port = newServer.address().port;
-          console.log(`✅ Server running securely on random port ${port}`);
-        });
-      } else {
-        console.error('Server error:', err);
-      }
-    });
+    app.listen(9000, () => console.log("✅ Server running on port 9000"));
   })
-  .catch((err) => console.error("❌ DB Connection Error:", err));
+  .catch(err => console.error("❌ DB connection failed", err));
