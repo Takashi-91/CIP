@@ -157,8 +157,8 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
   const match = await bcrypt.compare(password, user.password);
   if (!match) return res.status(400).json({ msg: "Invalid password" });
 
-  const token = jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET || "secret", { expiresIn: "1h" });
-  res.json({ token });
+const token = jwt.sign({ user: { id: user._id, role: user.role } }, process.env.JWT_SECRET || "secret", { expiresIn: "1h" });
+res.json({ token });
 });
 
 // Transfer Money
@@ -201,9 +201,11 @@ app.get("/api/transactions/history", authMiddleware, async (req, res) => {
 });
 
 // Freeze/Unfreeze (Employees)
-app.post("/api/employees/freeze", authMiddleware, employeeOnly, async (req, res) => {
-  const { userId, freeze } = req.body;
-  const user = await User.findById(userId);
+// Changed to PATCH /api/employees/users/:id/freeze
+app.patch("/api/employees/users/:id/freeze", authMiddleware, employeeOnly, async (req, res) => {
+  const { id } = req.params;
+  const { freeze } = req.body;
+  const user = await User.findById(id);
   if (!user) return res.status(404).json({ msg: "Not found" });
   user.isFrozen = freeze;
   await user.save();
@@ -214,6 +216,36 @@ app.post("/api/employees/freeze", authMiddleware, employeeOnly, async (req, res)
 app.delete("/api/employees/remove/:id", authMiddleware, employeeOnly, async (req, res) => {
   await User.findByIdAndDelete(req.params.id);
   res.json({ msg: "User removed" });
+});
+
+// Create user (Employees)
+app.post("/api/employees/users", authMiddleware, employeeOnly, async (req, res) => {
+  let { name, email, password, role } = req.body;
+  name = sanitizeInput(name);
+  email = sanitizeInput(email);
+
+  if (!name || !email || !password || !role) return res.status(400).json({ msg: "Missing fields" });
+  if (!namePattern.test(name)) return res.status(400).json({ msg: "Invalid name" });
+  if (!emailPattern.test(email)) return res.status(400).json({ msg: "Invalid email" });
+  if (!passwordPattern.test(password)) return res.status(400).json({ msg: "Weak password" });
+  if (!["employee", "customer"].includes(role)) return res.status(400).json({ msg: "Invalid role" });
+
+  const exists = await User.findOne({ email });
+  if (exists) return res.status(400).json({ msg: "Email already registered" });
+
+  const hashed = await bcrypt.hash(password, 12);
+  await User.create({ name, email, password: hashed, role });
+  res.status(201).json({ msg: "User created" });
+});
+
+// Get all users (Employees)
+app.get("/api/employees/users", authMiddleware, employeeOnly, async (req, res) => {
+  try {
+    const users = await User.find({}, 'name email role isFrozen balance');
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ msg: "Failed to fetch users" });
+  }
 });
 
 // Edit user
